@@ -16,7 +16,8 @@ import torch
 import gc
 import math
 import functools
-from typing import Optional, Tuple, List, Union
+import types
+from typing import Optional, Tuple, List, Union, Dict, Any
 from ._utils import *
 from ._utils import patch_unsloth_smart_gradient_checkpointing
 from ._utils import __version__
@@ -66,7 +67,6 @@ from peft import LoraConfig, TaskType, get_peft_model as _get_peft_model
 from peft import PeftModelForCausalLM
 from ..save import patch_saving_functions
 import re, os, inspect, math, sys
-import types
 try:
     from huggingface_hub.utils import get_token
 except:
@@ -2741,3 +2741,89 @@ pass
 
 from .rl import PatchFastRL
 PatchFastRL(FastLanguageModel = FastLlamaModel)
+
+# Add import for KBLaM components
+from .llama_kblam import KBLamLlamaAttention
+from .kblam import KBLaMConfig
+
+# Add this function at the end of the file
+def patch_llama_with_kblam(model, kb_config: KBLaMConfig):
+    """
+    Patch a Llama model with KBLaM support.
+    
+    Args:
+        model: The Llama model to patch
+        kb_config: KBLaM configuration
+        
+    Returns:
+        The patched model
+    """
+    # Store KB config in the model
+    model.kb_config = kb_config
+    
+    # Replace attention layers with KBLaM attention layers
+    for i, layer in enumerate(model.model.layers):
+        # Create new KBLaM attention layer
+        kblam_attention = KBLamLlamaAttention(model.config, layer_idx=i)
+        
+        # Copy weights from original attention layer
+        kblam_attention.q_proj.weight.data.copy_(layer.self_attn.q_proj.weight.data)
+        kblam_attention.k_proj.weight.data.copy_(layer.self_attn.k_proj.weight.data)
+        kblam_attention.v_proj.weight.data.copy_(layer.self_attn.v_proj.weight.data)
+        kblam_attention.o_proj.weight.data.copy_(layer.self_attn.o_proj.weight.data)
+        
+        if hasattr(layer.self_attn.q_proj, "bias") and layer.self_attn.q_proj.bias is not None:
+            kblam_attention.q_proj.bias.data.copy_(layer.self_attn.q_proj.bias.data)
+            kblam_attention.k_proj.bias.data.copy_(layer.self_attn.k_proj.bias.data)
+            kblam_attention.v_proj.bias.data.copy_(layer.self_attn.v_proj.bias.data)
+            kblam_attention.o_proj.bias.data.copy_(layer.self_attn.o_proj.bias.data)
+            
+        # Initialize KB-specific query projection if using separate query head
+        if kb_config.sep_query_head:
+            # Initialize with the same weights as the regular query projection
+            kblam_attention.q_proj_kb.weight.data.copy_(layer.self_attn.q_proj.weight.data)
+            if hasattr(layer.self_attn.q_proj, "bias") and layer.self_attn.q_proj.bias is not None:
+                kblam_attention.q_proj_kb.bias.data.copy_(layer.self_attn.q_proj.bias.data)
+        
+        # Replace attention layer with KBLaM attention
+        layer.self_attn = kblam_attention
+    
+    # Add forward wrapper to handle KB inputs
+    original_forward = model.forward
+    
+    def forward_with_kb(
+        self,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+        kb_kvs: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        **kwargs,
+    ):
+        # Process standard inputs
+        outputs = original_forward(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            # Pass KB inputs to the model
+            kb_kvs=kb_kvs,
+            kb_config=self.kb_config,
+            **kwargs,
+        )
+        return outputs
+    
+    # Bind the new forward method to the model
+    model.forward = types.MethodType(forward_with_kb, model)
+    
+    return model

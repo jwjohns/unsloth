@@ -67,6 +67,9 @@ from ._utils import (
     unsloth_compile_transformers,
 )
 
+# Add KBLaM imports
+from .kblam import KBLaMConfig, prepare_model_for_kblam
+
 global FORCE_FLOAT32
 FORCE_FLOAT32 = [
     "gemma3",
@@ -97,10 +100,24 @@ class FastLanguageModel(FastLlamaModel):
         random_state               = 3407,
         max_lora_rank              = 64,
         disable_log_stats          = True,
+        
+        # KBLaM parameters
+        enable_kblam               = False,
+        kb_layer_frequency         = 3,
+        kb_scale_factor            = None,
+        top_k_kb                   = 100,
+        kb_encoder_name            = "all-MiniLM-L6-v2",
+        kb_projector_type          = "mlp",
+        kb_dynamic_sparsify        = False,
+        kb_sep_query_head          = False,
+        kb_encoder_endpoint_url    = None,
+        kb_projector_kwargs        = {"mlp_depth": 1, "mlp_hidden_dim": 512},
+        
         *args, **kwargs,
     ):
         if load_in_8bit or full_finetuning:
-            return FastModel.from_pretrained(
+            # For full finetuning or 8bit training, delegate to FastModel
+            model, tokenizer = FastModel.from_pretrained(
                 model_name                 = model_name,
                 max_seq_length             = max_seq_length,
                 dtype                      = dtype,
@@ -120,6 +137,39 @@ class FastLanguageModel(FastLlamaModel):
                 use_exact_model_name       = use_exact_model_name,
                 *args, **kwargs,
             )
+            
+            # Initialize KBLaM if requested
+            if enable_kblam:
+                from ..kblam_utils import KBEncoder
+                
+                # Create KBLaM configuration
+                kb_config = KBLaMConfig(
+                    base_model_name_or_path=model_name,
+                    kb_layer_frequency=kb_layer_frequency,
+                    kb_scale_factor=kb_scale_factor,
+                    top_k_kb=top_k_kb,
+                    dynamic_sparsify=kb_dynamic_sparsify,
+                    sep_query_head=kb_sep_query_head,
+                )
+                
+                # Initialize KB encoder
+                hidden_size = model.config.hidden_size
+                num_hidden_layers = model.config.num_hidden_layers
+                
+                kb_encoder = KBEncoder(
+                    encoder_name=kb_encoder_name,
+                    projector_type=kb_projector_type,
+                    out_dim=hidden_size * (num_hidden_layers // kb_layer_frequency + 1),
+                    endpoint_url=kb_encoder_endpoint_url,
+                    projector_kwargs=kb_projector_kwargs,
+                    frozen_base_model=True,
+                    load_in_4bit=load_in_4bit,
+                )
+                
+                # Prepare model for KBLaM
+                model, kb_processor = prepare_model_for_kblam(model, kb_config, kb_encoder)
+            
+            return model, tokenizer
         pass
 
         if token is None: token = get_token()
@@ -428,6 +478,41 @@ class FastLanguageModel(FastLlamaModel):
             # Patch it as well!
             model = dispatch_model.patch_peft_model(model, use_gradient_checkpointing)
         pass
+
+        # After the model is loaded successfully, initialize KBLaM if requested
+        if enable_kblam and is_model and is_peft:
+            from ..kblam_utils import KBEncoder
+            
+            # Create KBLaM configuration
+            kb_config = KBLaMConfig(
+                base_model_name_or_path=model_name,
+                kb_layer_frequency=kb_layer_frequency,
+                kb_scale_factor=kb_scale_factor,
+                top_k_kb=top_k_kb,
+                dynamic_sparsify=kb_dynamic_sparsify,
+                sep_query_head=kb_sep_query_head,
+            )
+            
+            # Initialize KB encoder
+            hidden_size = model.config.hidden_size
+            num_hidden_layers = model.config.num_hidden_layers
+            
+            kb_encoder = KBEncoder(
+                encoder_name=kb_encoder_name,
+                projector_type=kb_projector_type,
+                out_dim=hidden_size * (num_hidden_layers // kb_layer_frequency + 1),
+                endpoint_url=kb_encoder_endpoint_url,
+                projector_kwargs=kb_projector_kwargs,
+                frozen_base_model=True,
+                load_in_4bit=load_in_4bit,
+            )
+            
+            # Prepare model for KBLaM
+            model, kb_processor = prepare_model_for_kblam(model, kb_config, kb_encoder)
+            
+            # Add the processor to the tokenizer
+            tokenizer.kb_processor = kb_processor
+        
         return model, tokenizer
     pass
 pass

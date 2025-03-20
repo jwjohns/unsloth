@@ -14,7 +14,7 @@
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union, Dict, List, Tuple, Callable, Any
 from functools import wraps
 
 import trl
@@ -29,6 +29,9 @@ from unsloth_zoo.vision_utils import (
 )
 from packaging.version import Version
 import dataclasses
+import torch
+import torch.nn as nn
+from transformers import PreTrainedTokenizerBase
 
 __all__ = [
     "UnslothTrainingArguments",
@@ -134,6 +137,77 @@ class UnslothTrainer(SFTTrainer):
             )
         pass
         return self.optimizer
+    pass
+
+    def __init__(
+        self,
+        model: nn.Module = None,
+        args: TrainingArguments = None,
+        data_collator: Optional[DataCollator] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Optional[Union[Dataset, Dict[str, Dataset]]] = None,
+        tokenizer: Optional[PreTrainedTokenizerBase] = None,
+        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        callbacks: Optional[List[TrainerCallback]] = None,
+        optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
+        preprocess_logits_for_metrics: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
+        
+        # Add KB-specific parameters
+        dataset_kb_field: Optional[str] = None,
+        
+        **kwargs,
+    ):
+        # Save KB field name
+        self.dataset_kb_field = dataset_kb_field
+        
+        super().__init__(
+            model,
+            args,
+            data_collator,
+            train_dataset,
+            eval_dataset,
+            tokenizer,
+            compute_metrics,
+            callbacks,
+            optimizers,
+            preprocess_logits_for_metrics,
+            **kwargs,
+        )
+    pass
+
+    def _prepare_inputs(self, inputs: Dict[str, Union[torch.Tensor, Any]]) -> Dict[str, Union[torch.Tensor, Any]]:
+        """
+        Prepare inputs for the model, including KB inputs if present.
+        
+        Args:
+            inputs: The inputs to prepare
+            
+        Returns:
+            Prepared inputs
+        """
+        prepared_inputs = super()._prepare_inputs(inputs)
+        
+        # Process KB inputs if present
+        if self.dataset_kb_field is not None and self.dataset_kb_field in inputs:
+            kb_data = inputs[self.dataset_kb_field]
+            
+            # Process KB inputs if model has KB processor
+            if hasattr(self.model, "prepare_kb_inputs") and kb_data is not None:
+                # Process KB at batch level since each example might have different KB entries
+                kb_inputs_list = []
+                
+                # Process each example in the batch
+                for kb_item in kb_data:
+                    if kb_item is not None and len(kb_item) > 0:
+                        kb_inputs = self.model.prepare_kb_inputs(kb_item)
+                        kb_inputs_list.append(kb_inputs)
+                    else:
+                        kb_inputs_list.append(None)
+                
+                # Add to prepared inputs
+                prepared_inputs["kb_kvs"] = kb_inputs_list
+        
+        return prepared_inputs
     pass
 pass
 
