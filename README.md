@@ -32,6 +32,7 @@ Notebooks are beginner friendly. Read our [guide](https://docs.unsloth.ai/get-st
 | **Llama 3.1 (8B)**      | [▶️ Start for free](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Llama3.1_(8B)-Alpaca.ipynb)               | 2x faster | 70% less |
 | **Mistral v0.3 (7B)**    | [▶️ Start for free](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Mistral_v0.3_(7B)-Conversational.ipynb)               | 2.2x faster | 75% less |
 | **Orpheus-TTS (3B)**     | [▶️ Start for free](https://colab.research.google.com/github/unslothai/notebooks/blob/main/nb/Orpheus_(3B)-TTS.ipynb)               | 1.5x faster | 50% less |
+| **Nemotron-H (9B)**      | [▶️ Example](examples/nemotron_h_example.py) | 2x faster | 60% less |
 
 - See all our notebooks for: [Kaggle](https://github.com/unslothai/notebooks?tab=readme-ov-file#-kaggle-notebooks), [GRPO](https://docs.unsloth.ai/get-started/unsloth-notebooks#grpo-reasoning-rl-notebooks), **[TTS](https://docs.unsloth.ai/get-started/unsloth-notebooks#text-to-speech-tts-notebooks)** & [Vision](https://docs.unsloth.ai/get-started/unsloth-notebooks#vision-multimodal-notebooks)
 - See [all our models](https://docs.unsloth.ai/get-started/all-our-models) and [all our notebooks](https://github.com/unslothai/notebooks)

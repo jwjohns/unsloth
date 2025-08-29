@@ -60,6 +60,7 @@ SUPPORTS_QWEN3_MOE = transformers_version >= Version("4.50.3")
 SUPPORTS_FALCON_H1 = transformers_version >= Version("4.53.0")
 SUPPORTS_GEMMA3N   = transformers_version >= Version("4.53.0")
 SUPPORTS_GPTOSS    = transformers_version >= Version("4.55.0")
+SUPPORTS_NEMOTRON_H = transformers_version >= Version("4.43.0")  # Nemotron-H support
 if SUPPORTS_GEMMA:
     from .gemma  import FastGemmaModel
 if SUPPORTS_GEMMA2:
@@ -67,6 +68,9 @@ if SUPPORTS_GEMMA2:
 pass
 if SUPPORTS_FALCON_H1:
     from .falcon_h1 import FastFalconH1Model
+pass
+if SUPPORTS_NEMOTRON_H:
+    from .nemotron_h import FastNemotronHModel
 pass
 import torch
 from ._utils import (
@@ -328,6 +332,15 @@ class FastLanguageModel(FastLlamaModel):
                     f"to obtain the latest transformers build, then restart this session."\
                 )
             dispatch_model = FastQwen3Model if model_type == "qwen3" else FastQwen3MoeModel
+        elif model_type in ["nemotron_h", "nemotronh"]:
+            if not SUPPORTS_NEMOTRON_H:
+                raise ImportError(
+                    f"Unsloth: Your transformers version of {transformers_version} does not support Nemotron-H.\n"\
+                    f"The minimum required version is 4.43.0.\n"\
+                    f'Try `pip install --upgrade "transformers>=4.43.0"`\n'\
+                    f"to obtain the latest transformers build, then restart this session."\
+                )
+            dispatch_model = FastNemotronHModel
         # elif model_type == "falcon_h1":
         #     dispatch_model = FastFalconH1Model
         #     if not SUPPORTS_FALCON_H1:
