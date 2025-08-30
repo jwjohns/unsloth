@@ -1,4 +1,5 @@
 from unsloth import FastLanguageModel
+from unsloth.models.nemotron_h import FastNemotronHModel
 from trl import SFTTrainer, SFTConfig
 from datasets import load_dataset
 
@@ -11,37 +12,14 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     trust_remote_code = True,
 )
 
-# Setup LoRA for Nemotron-H - targets all 25 MLP layers (50 projections)
+# Get optimal LoRA targets for Nemotron-H (all 25 MLP layers = 50 projections)
+nemotron_targets = FastNemotronHModel.get_lora_targets(model.config)
+
+# Setup LoRA for Nemotron-H
 model = FastLanguageModel.get_peft_model(
     model,
     r = 16,
-    target_modules = [
-        "backbone.layers.1.mixer.up_proj", "backbone.layers.1.mixer.down_proj",
-        "backbone.layers.3.mixer.up_proj", "backbone.layers.3.mixer.down_proj", 
-        "backbone.layers.5.mixer.up_proj", "backbone.layers.5.mixer.down_proj",
-        "backbone.layers.8.mixer.up_proj", "backbone.layers.8.mixer.down_proj",
-        "backbone.layers.10.mixer.up_proj", "backbone.layers.10.mixer.down_proj",
-        "backbone.layers.12.mixer.up_proj", "backbone.layers.12.mixer.down_proj",
-        "backbone.layers.15.mixer.up_proj", "backbone.layers.15.mixer.down_proj",
-        "backbone.layers.17.mixer.up_proj", "backbone.layers.17.mixer.down_proj",
-        "backbone.layers.19.mixer.up_proj", "backbone.layers.19.mixer.down_proj",
-        "backbone.layers.22.mixer.up_proj", "backbone.layers.22.mixer.down_proj",
-        "backbone.layers.24.mixer.up_proj", "backbone.layers.24.mixer.down_proj",
-        "backbone.layers.26.mixer.up_proj", "backbone.layers.26.mixer.down_proj",
-        "backbone.layers.28.mixer.up_proj", "backbone.layers.28.mixer.down_proj",
-        "backbone.layers.31.mixer.up_proj", "backbone.layers.31.mixer.down_proj",
-        "backbone.layers.33.mixer.up_proj", "backbone.layers.33.mixer.down_proj",
-        "backbone.layers.35.mixer.up_proj", "backbone.layers.35.mixer.down_proj",
-        "backbone.layers.37.mixer.up_proj", "backbone.layers.37.mixer.down_proj",
-        "backbone.layers.40.mixer.up_proj", "backbone.layers.40.mixer.down_proj",
-        "backbone.layers.42.mixer.up_proj", "backbone.layers.42.mixer.down_proj",
-        "backbone.layers.45.mixer.up_proj", "backbone.layers.45.mixer.down_proj",
-        "backbone.layers.47.mixer.up_proj", "backbone.layers.47.mixer.down_proj",
-        "backbone.layers.49.mixer.up_proj", "backbone.layers.49.mixer.down_proj",
-        "backbone.layers.51.mixer.up_proj", "backbone.layers.51.mixer.down_proj",
-        "backbone.layers.53.mixer.up_proj", "backbone.layers.53.mixer.down_proj",
-        "backbone.layers.55.mixer.up_proj", "backbone.layers.55.mixer.down_proj",
-    ],
+    target_modules = nemotron_targets,
     lora_alpha = 32,
     lora_dropout = 0.1,
     bias = "none",
