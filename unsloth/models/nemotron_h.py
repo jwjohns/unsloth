@@ -125,8 +125,12 @@ class FastNemotronHModel(FastLlamaModel):
         if "use_cache" not in kwargs:
             kwargs["use_cache"] = False  # Disable KV cache during training
         
-        # Call parent class method with Nemotron-H optimizations
-        model, tokenizer = FastLlamaModel.from_pretrained(
+        # Nemotron-H models use custom architectures that don't fit standard Llama patterns
+        # We need to use the generic FastModel fallback for hybrid architectures
+        from .llama import FastModel
+        
+        # Use generic model loader that supports custom architectures
+        model, tokenizer = FastModel.from_pretrained(
             model_name=model_name,
             max_seq_length=max_seq_length,
             dtype=dtype,
@@ -141,6 +145,8 @@ class FastNemotronHModel(FastLlamaModel):
             use_gradient_checkpointing=use_gradient_checkpointing,
             resize_model_vocab=resize_model_vocab,
             revision=revision,
+            return_logits=False,
+            fullgraph=True,
             use_exact_model_name=use_exact_model_name,
             *args,
             **kwargs,

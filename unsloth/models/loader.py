@@ -332,15 +332,15 @@ class FastLanguageModel(FastLlamaModel):
                     f"to obtain the latest transformers build, then restart this session."\
                 )
             dispatch_model = FastQwen3Model if model_type == "qwen3" else FastQwen3MoeModel
-        elif model_type in ["nemotron_h", "nemotronh"]:
-            if not SUPPORTS_NEMOTRON_H:
-                raise ImportError(
-                    f"Unsloth: Your transformers version of {transformers_version} does not support Nemotron-H.\n"\
-                    f"The minimum required version is 4.43.0.\n"\
-                    f'Try `pip install --upgrade "transformers>=4.43.0"`\n'\
-                    f"to obtain the latest transformers build, then restart this session."\
-                )
-            dispatch_model = FastNemotronHModel
+        # elif model_type in ["nemotron_h", "nemotronh"]:
+        #     if not SUPPORTS_NEMOTRON_H:
+        #         raise ImportError(
+        #             f"Unsloth: Your transformers version of {transformers_version} does not support Nemotron-H.\n"\
+        #             f"The minimum required version is 4.43.0.\n"\
+        #             f'Try `pip install --upgrade "transformers>=4.43.0"`\n'\
+        #             f"to obtain the latest transformers build, then restart this session."\
+        #         )
+        #     dispatch_model = FastNemotronHModel
         # elif model_type == "falcon_h1":
         #     dispatch_model = FastFalconH1Model
         #     if not SUPPORTS_FALCON_H1:
